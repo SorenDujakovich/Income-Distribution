@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toledo, OH — Median Household Income by ZIP Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f4f1ea; --paper:#fbf9f3; --ink:#1a1a1a;
+  --muted:#6e6862; --line:#d8d2c3; --accent:#a83232;
+}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg); color:var(--ink);
+  min-height:100vh;
+  padding:30px 20px;
+}
+
+.page{
+  max-width:1100px; margin:0 auto;
+  background:var(--paper);
+  padding:38px 44px;
+  border:1px solid var(--line);
+  box-shadow:0 2px 20px rgba(0,0,0,0.06);
+}
+.eyebrow{
+  font-size:11px; letter-spacing:0.18em; text-transform:uppercase;
+  color:var(--accent); font-weight:600;
+  margin-bottom:14px;
+}
+h1{
+  font-family:'Playfair Display',serif;
+  font-weight:900;
+  font-size:42px;
+  line-height:1.1;
+  letter-spacing:-0.01em;
+  margin-bottom:8px;
+}
+.subtitle{
+  font-size:16px;
+  color:var(--muted);
+  margin-bottom:6px;
+}
+.meta{
+  font-size:12px;
+  color:var(--muted);
+  padding-bottom:24px;
+  border-bottom:1px solid var(--line);
+  margin-bottom:24px;
+}
+
+/* ── Stats strip ── */
+.stats-strip{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:0;
+  margin-bottom:28px;
+  border:1px solid var(--line);
+  background:#fff;
+}
+.stat{
+  padding:16px 18px;
+  border-right:1px solid var(--line);
+}
+.stat:last-child{border-right:none}
+.stat-label{
+  font-size:10px; letter-spacing:0.12em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:6px; font-weight:600;
+}
+.stat-val{
+  font-family:'Playfair Display',serif;
+  font-size:24px; font-weight:700;
+  color:var(--ink);
+}
+.stat-val small{font-size:13px; color:var(--muted); font-weight:400; font-family:'Inter',sans-serif}
+
+/* ── Map ── */
+.map-section{
+  display:grid; grid-template-columns:1fr 280px; gap:0;
+  border:1px solid var(--line);
+  margin-bottom:32px;
+}
+#map{
+  height:540px;
+  background:#e8e4d8;
+}
+.legend-panel{
+  background:#fff;
+  border-left:1px solid var(--line);
+  padding:22px 22px;
+  display:flex; flex-direction:column; gap:18px;
+}
+.legend-title{
+  font-family:'Playfair Display',serif;
+  font-size:18px; font-weight:700;
+  border-bottom:1px solid var(--line);
+  padding-bottom:10px;
+}
+.legend-sub{
+  font-size:11px; color:var(--muted); margin-top:-12px;
+}
+.lscale{
+  display:flex; flex-direction:column; gap:0;
+  border:1px solid var(--line);
+}
+.lscale-row{
+  display:flex; align-items:center;
+  border-bottom:1px solid var(--line);
+}
+.lscale-row:last-child{border-bottom:none}
+.lswatch{
+  width:36px; height:30px; flex-shrink:0;
+  border-right:1px solid var(--line);
+}
+.lscale-text{
+  padding:6px 12px; font-size:11px;
+  font-variant-numeric:tabular-nums;
+  font-weight:500;
+  flex:1;
+}
+
+.callout{
+  font-size:11px; line-height:1.6; color:var(--muted);
+  padding:12px 14px;
+  background:rgba(168,50,50,0.04);
+  border-left:3px solid var(--accent);
+}
+.callout strong{color:var(--ink); font-weight:600}
+
+/* ── ZIP table ── */
+.section-title{
+  font-family:'Playfair Display',serif;
+  font-size:22px; font-weight:700;
+  margin-bottom:8px;
+}
+.section-desc{
+  font-size:13px; color:var(--muted); margin-bottom:16px;
+}
+table.zip-table{
+  width:100%; border-collapse:collapse;
+  background:#fff; font-size:13px;
+  border:1px solid var(--line);
+}
+table.zip-table th{
+  text-align:left; padding:10px 14px;
+  font-size:10px; letter-spacing:0.1em;
+  text-transform:uppercase; color:var(--muted);
+  background:#f9f7f0; border-bottom:1px solid var(--line);
+  font-weight:600;
+}
+table.zip-table td{
+  padding:11px 14px; border-bottom:1px solid var(--line);
+  font-variant-numeric:tabular-nums;
+}
+table.zip-table tr:last-child td{border-bottom:none}
+table.zip-table tr:hover{background:#faf8f1}
+.zip-tile{
+  display:inline-block; width:11px; height:11px;
+  margin-right:8px; vertical-align:middle;
+  border:1px solid rgba(0,0,0,0.1);
+}
+.income-bar-wrap{
+  display:inline-block; width:80px; height:6px;
+  background:#eeeae0; vertical-align:middle;
+  margin-left:8px;
+}
+.income-bar{height:100%; background:var(--accent)}
+
+/* ── Footer ── */
+.footer-note{
+  margin-top:28px;
+  padding-top:18px;
+  border-top:1px solid var(--line);
+  font-size:11px; color:var(--muted); line-height:1.7;
+}
+.footer-note a{color:var(--accent)}
+
+/* Loading state */
+#map-loading{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  background:#e8e4d8; color:var(--muted); font-size:13px;
+  pointer-events:none;
+}
+#map-loading.hidden{display:none}
+
+@media (max-width:780px){
+  .stats-strip{grid-template-columns:1fr 1fr}
+  .stat:nth-child(2){border-right:none}
+  .stat:nth-child(1),.stat:nth-child(2){border-bottom:1px solid var(--line)}
+  .map-section{grid-template-columns:1fr}
+  .legend-panel{border-left:none; border-top:1px solid var(--line)}
+  h1{font-size:30px}
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="eyebrow">Lucas County · Census 2024</div>
+  <h1>Toledo, Ohio<br/>Median Household Income</h1>
+  <p class="subtitle">A geographic distribution of household earnings across Toledo's ZIP codes.</p>
+  <p class="meta">Source: U.S. Census Bureau, American Community Survey 5-Year Estimates (2020–2024) · Table B19013</p>
+
+  <div class="stats-strip">
+    <div class="stat">
+      <div class="stat-label">City Median</div>
+      <div class="stat-val">$49,724</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Lucas County</div>
+      <div class="stat-val">$62,224</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">State of Ohio</div>
+      <div class="stat-val">$71,389</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">ZIP Range</div>
+      <div class="stat-val">$29k <small>– $67k</small></div>
+    </div>
+  </div>
+
+  <div class="map-section">
+    <div style="position:relative">
+      <div id="map"></div>
+      <div id="map-loading">Loading ZIP code boundaries…</div>
+    </div>
+    <div class="legend-panel">
+      <div>
+        <div class="legend-title">Income Bracket</div>
+        <div class="legend-sub" style="margin-top:6px">Median household income, 2024</div>
+      </div>
+      <div class="lscale">
+        <div class="lscale-row"><div class="lswatch" style="background:#3a0e0e"></div><div class="lscale-text">Under $30,000</div></div>
+        <div class="lscale-row"><div class="lswatch" style="background:#7a1f1f"></div><div class="lscale-text">$30,000 – $45,000</div></div>
+        <div class="lscale-row"><div class="lswatch" style="background:#b85a3a"></div><div class="lscale-text">$45,000 – $55,000</div></div>
+        <div class="lscale-row"><div class="lswatch" style="background:#e0a060"></div><div class="lscale-text">$55,000 – $65,000</div></div>
+        <div class="lscale-row"><div class="lswatch" style="background:#f6dba0"></div><div class="lscale-text">$65,000 and above</div></div>
+      </div>
+      <div class="callout">
+        <strong>The disparity:</strong> ZIP 43623 in west Toledo earns <strong>2.4×</strong> what ZIP 43608 earns. A household crossing a few miles can see a $40,000+ gap in median income.
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">ZIP-Level Detail</div>
+  <p class="section-desc">All Toledo ZIP codes ranked by median household income.</p>
+
+  <table class="zip-table">
+    <thead>
+      <tr>
+        <th>ZIP</th>
+        <th>Area</th>
+        <th>Population</th>
+        <th>Median Income</th>
+        <th>vs. City</th>
+      </tr>
+    </thead>
+    <tbody id="zip-tbody"></tbody>
+  </table>
+
+  <p class="footer-note">
+    Data sourced from the U.S. Census Bureau's American Community Survey (ACS) 5-Year Estimates, 2020–2024. ZIP-code income figures via incomebyzipcode.com and zip-codes.com (B19013, 2024 inflation-adjusted dollars). ZIP boundary geometries from the Census TIGER cartographic boundary files. Map rendered with Leaflet · CartoDB Positron tiles.
+  </p>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Toledo-area ZIP income data (ACS 2024 5-year estimates) ──
+const ZIPS = {
+  '43604': { name: 'Downtown Toledo',      pop: 1813,  income: 21953 },
+  '43605': { name: 'East Toledo',          pop: 27244, income: 38291 },
+  '43606': { name: 'Old West End / Univ.', pop: 25671, income: 66917 },
+  '43607': { name: 'West Toledo',          pop: 21340, income: 32568 },
+  '43608': { name: 'North Toledo',         pop: 18205, income: 29275 },
+  '43609': { name: 'South Toledo',         pop: 19612, income: 41827 },
+  '43610': { name: 'Vistula / North End',  pop: 4885,  income: 46469 },
+  '43611': { name: 'Point Place',          pop: 18505, income: 62042 },
+  '43612': { name: 'North Toledo',         pop: 28190, income: 50728 },
+  '43613': { name: 'West Toledo / Trilby', pop: 31845, income: 64384 },
+  '43614': { name: 'Reynolds Corners',     pop: 29866, income: 58961 },
+  '43615': { name: 'West Toledo',          pop: 35427, income: 54193 },
+  '43620': { name: 'Old West End',         pop: 4982,  income: 39268 },
+  '43623': { name: 'Ottawa Hills border',  pop: 16928, income: 71171 }
+};
+
+const CITY_MEDIAN = 49724;
+
+function getColor(income) {
+  return income >= 65000 ? '#f6dba0' :
+         income >= 55000 ? '#e0a060' :
+         income >= 45000 ? '#b85a3a' :
+         income >= 30000 ? '#7a1f1f' :
+                           '#3a0e0e';
+}
+
+// ── Map setup ──
+const map = L.map('map', {
+  center: [41.665, -83.575],
+  zoom: 11,
+  zoomControl: true,
+  attributionControl: true,
+  scrollWheelZoom: false
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO',
+  subdomains: 'abcd',
+  maxZoom: 18
+}).addTo(map);
+
+// Labels overlay
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd', maxZoom: 18, pane: 'shadowPane'
+}).addTo(map);
+
+// ── Fetch ZIP boundaries from a public TIGER source ──
+// Using OpenDataDE - hosts US Census ZCTA shapes per state on GitHub Pages
+const ZIP_GEOJSON_URL =
+  'https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/oh_ohio_zip_codes_geo.min.json';
+
+async function loadMap() {
+  try {
+    const r = await fetch(ZIP_GEOJSON_URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const all = await r.json();
+
+    // Filter to Toledo ZIPs only
+    const toledoZips = new Set(Object.keys(ZIPS));
+    const filtered = {
+      type: 'FeatureCollection',
+      features: all.features.filter(f => toledoZips.has(f.properties.ZCTA5CE10))
+    };
+
+    document.getElementById('map-loading').classList.add('hidden');
+
+    const layer = L.geoJSON(filtered, {
+      style: function(feature) {
+        const zip = feature.properties.ZCTA5CE10;
+        const data = ZIPS[zip];
+        return {
+          fillColor: data ? getColor(data.income) : '#ddd',
+          fillOpacity: 0.85,
+          color: '#fff',
+          weight: 1.5
+        };
+      },
+      onEachFeature: function(feature, lyr) {
+        const zip = feature.properties.ZCTA5CE10;
+        const d = ZIPS[zip];
+        if (!d) return;
+
+        const center = lyr.getBounds().getCenter();
+        // Permanent label
+        L.marker(center, {
+          icon: L.divIcon({
+            className: 'zip-label',
+            html: `<div style="
+              font-family:'Inter',sans-serif;font-size:10px;font-weight:600;
+              color:#1a1a1a;background:rgba(255,255,255,0.85);
+              padding:2px 6px;border-radius:2px;white-space:nowrap;
+              text-align:center;line-height:1.3;
+              box-shadow:0 1px 3px rgba(0,0,0,0.15);
+            ">
+              ${zip}<br/>
+              <span style="font-size:9px;color:#a83232;font-weight:500">$${(d.income/1000).toFixed(0)}k</span>
+            </div>`,
+            iconSize: [60, 28],
+            iconAnchor: [30, 14]
+          }),
+          interactive: false
+        }).addTo(map);
+
+        // Hover popup
+        lyr.on('mouseover', function(e) {
+          lyr.setStyle({weight: 3, color: '#1a1a1a'});
+        });
+        lyr.on('mouseout', function() { layer.resetStyle(lyr); });
+        lyr.bindTooltip(`
+          <strong style="font-family:'Playfair Display',serif;font-size:14px">ZIP ${zip}</strong><br/>
+          <span style="color:#666">${d.name}</span><br/>
+          <strong style="color:#a83232">$${d.income.toLocaleString()}</strong>
+          <span style="color:#999;font-size:11px">median household income</span>
+        `, {sticky: true, direction: 'top', className: 'zip-tooltip'});
+      }
+    }).addTo(map);
+
+    map.fitBounds(layer.getBounds(), {padding: [20, 20]});
+  } catch(e) {
+    document.getElementById('map-loading').innerHTML =
+      'Could not load ZIP boundaries.<br/><span style="font-size:11px">' + e.message + '</span>';
+  }
+}
+
+// ── Build the table ──
+const sorted = Object.entries(ZIPS).sort((a, b) => b[1].income - a[1].income);
+const maxInc = Math.max(...Object.values(ZIPS).map(z => z.income));
+const tbody = document.getElementById('zip-tbody');
+sorted.forEach(([zip, d]) => {
+  const pct = ((d.income / CITY_MEDIAN - 1) * 100).toFixed(0);
+  const pctTxt = pct >= 0 ? `+${pct}%` : `${pct}%`;
+  const pctColor = pct >= 0 ? '#2d6b3a' : '#a83232';
+  const barW = (d.income / maxInc) * 100;
+  tbody.innerHTML += `
+    <tr>
+      <td><span class="zip-tile" style="background:${getColor(d.income)}"></span><strong>${zip}</strong></td>
+      <td>${d.name}</td>
+      <td>${d.pop.toLocaleString()}</td>
+      <td>$${d.income.toLocaleString()}<span class="income-bar-wrap"><span class="income-bar" style="width:${barW}%"></span></span></td>
+      <td style="color:${pctColor};font-weight:500">${pctTxt}</td>
+    </tr>`;
+});
+
+loadMap();
+</script>
+</body>
+</html>
